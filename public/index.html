@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="ru" data-theme="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Einhell — Бронь для сервиса</title>
+<meta name="description" content="Онлайн список моделей: Бронь для сервиса" />
+
+<link rel="stylesheet" href="./styles.css?v=1" />
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+
+<style>
+  :root{
+    --radius:14px; --shadow:0 1px 3px rgba(0,0,0,.08);
+    --input:#fff; --inputText:#111;
+    --ok:#2e7d32; --warn:#b91c1c;
+    --chip-bg:#e9ecef; --chip-ink:#111;
+    --hdr-h:56px; --controls-top:56px;
+    --icon-header-light:#111;
+    --icon-header-dark:#f2f2f7;
+    --bulb-warm-filter: invert(53%) sepia(84%) saturate(1450%) hue-rotate(10deg) brightness(96%) contrast(102%);
+    --bulb-cool-filter: invert(71%) sepia(13%) saturate(2213%) hue-rotate(208deg) brightness(101%) contrast(102%);
+  }
+  html[data-theme="dark"]{
+    --shadow:0 1px 3px rgba(0,0,0,.55);
+    --input:#2c2c2e; --inputText:#f2f2f7;
+    --chip-bg:#3a3a3c; --chip-ink:#f2f2f7;
+  }
+  *{box-sizing:border-box}
+  html,body{max-width:100%;overflow-x:hidden}
+  body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);padding-top:var(--hdr-h)}
+  .hidden{display:none!important}
+  .muted{color:var(--muted)}
+  .icon{width:22px;height:22px;display:inline-block;vertical-align:middle}
+
+  header{position:fixed;inset:0 0 auto 0;z-index:1000;display:flex;align-items:center;gap:10px;background:var(--brand);color:#fff;padding:8px 12px;box-shadow:0 2px 6px rgba(0,0,0,.15)}
+  .logo{height:28px;background:#fff;border-radius:6px;padding:4px}
+  .hdr-spacer{flex:1}
+  .chip{display:inline-flex;align-items:center;gap:8px;background:var(--chip-bg);color:var(--chip-ink);padding:8px 14px;border-radius:14px;font-weight:800;box-shadow:inset 0 0 0 1px rgba(0,0,0,.05)}
+  .hdr-btn{display:inline-flex;align-items:center;justify-content:center;width:48px;height:44px;border-radius:14px;border:0;cursor:pointer;background:var(--chip-bg);color:var(--icon-header-light);font-size:0}
+  html[data-theme="dark"] .hdr-btn{ color:var(--icon-header-dark) }
+  #themeIcon{width:22px;height:22px}
+  html[data-theme="light"] #themeIcon{filter:var(--bulb-warm-filter)}
+  html[data-theme="dark"]  #themeIcon{filter:var(--bulb-cool-filter)}
+
+  .controls{position:sticky;top:var(--controls-top);z-index:900;background:var(--bg);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 10px}
+  .group{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .search{flex:1 1 200px;max-width:520px;position:relative}
+  .search input{width:100%;padding:10px 40px 10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--input);color:var(--inputText)}
+  .clear-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:none;background:transparent;cursor:pointer;padding:6px;color:#9ca3af}
+  select{padding:9px 10px;border:1px solid var(--border);border-radius:10px;background:var(--input);color:var(--inputText)}
+
+  .stats{padding:6px 12px;font-size:13px;color:var(--muted);display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .list{padding:8px 10px 18px;display:grid;gap:10px}
+  .card{overflow:hidden;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:12px;box-shadow:var(--shadow);display:grid;gap:10px}
+  .card.oos{opacity:.45;filter:grayscale(100%)}
+  .row1{display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .sku{font-weight:900;font-size:26px;letter-spacing:.3px}
+  .badge{font-size:12px;padding:6px 10px;border-radius:999px;font-weight:800;color:#fff;white-space:nowrap}
+  .ok{background:var(--ok)} .no{background:var(--warn)}
+  .model{font-size:16px;line-height:1.35}
+  .meta{display:flex;justify-content:space-between;align-items:center;gap:12px}
+  .leftMeta{display:flex;align-items:center;gap:14px}
+  .thumb{width:84px;height:84px;object-fit:contain;background:#fff;border:1px solid var(--border);border-radius:14px}
+  .qtyBig{font-weight:900;font-size:34px}
+  .qtyLabel{font-weight:800;color:var(--muted);margin-right:10px}
+
+  @media(min-width:760px){.list{grid-template-columns:repeat(2,1fr)} .card{padding:14px}}
+  @media(min-width:1100px){.list{grid-template-columns:repeat(3,1fr)}}
+
+  .footer{padding:14px;text-align:center;color:var(--muted);font-size:12px}
+</style>
+</head>
+
+<body>
+  <header id="hdr">
+    <img class="logo" src="logo.png" alt="E" onerror="this.style.display='none'">
+    <div class="hdr-spacer"></div>
+    <div class="chip" id="itemsCount">0 позиций</div>
+    <button id="themeToggle" class="hdr-btn" title="Тема" aria-label="Переключить тему">
+      <img id="themeIcon" alt="theme">
+    </button>
+  </header>
+
+  <div class="controls" id="controls">
+    <div class="group" style="width:100%">
+      <div class="search">
+        <input id="q" type="text" placeholder="Артикул или модель…" autocomplete="off" />
+        <button class="clear-btn" id="clear" title="Очистить" aria-label="Очистить">
+          <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M18 6 6 18"></path><path d="M6 6l12 12"></path>
+          </svg>
+        </button>
+      </div>
+
+      <label class="group" style="font-size:13px">
+        <input type="checkbox" id="onlyInStock" />
+        <span>Только в наличии</span>
+      </label>
+
+      <label class="group" style="font-size:13px">
+        <input type="checkbox" id="showImages" checked />
+        <span>Изображения</span>
+      </label>
+
+      <div class="group" title="Сортировка">
+        <select id="sortKey">
+          <option value="default">Сортировка</option>
+          <option value="qty_desc">Бронь ↓</option>
+          <option value="qty_asc">Бронь ↑</option>
+          <option value="sku_asc">SKU ↑</option>
+          <option value="sku_desc">SKU ↓</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div id="view-list">
+    <div class="stats" id="stats">Загрузка…</div>
+    <div class="muted" id="error" hidden></div>
+    <div class="list" id="list"></div>
+  </div>
+
+  <div class="footer" id="footer">Данные обновляются каждые ~3 часа.</div>
+
+<script>
+  // Theme icons
+  const BULB_ON = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNSAxNGMuMi0xIC43LTEuNyAxLjUtMi41IDEtLjkgMS41LTIuMiAxLjUtMy41QTYgNiAwIDAgMCA2IDhjMCAxIC4yIDIuMiAxLjUgMy41LjcuNyAxLjMgMS41IDEuNSAyLjUiLz48cGF0aCBkPSJNOSAxOGg2Ii8+PHBhdGggZD0iTTEwIDIyaDQiLz48L3N2Zz4=";
+  const BULB_OFF_X = "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9ImN1cnJlbnRDb2xvciIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiPjxwYXRoIGQ9Ik0xNi44IDExLjJjLjgtLjkgMS4yLTIgMS4yLTMuMmE2IDYgMCAwIDAtOS4zLTUiLz48cGF0aCBkPSJtMiAyIDIwIDIwIi8+PHBhdGggZD0iTTYuMyA2LjNhNC42NyA0LjY3IDAgMCAwIDEuMiA1LjJjLjcuNyAxLjMgMS41IDEuNSAyLjUiLz48cGF0aCBkPSJNOSAxOGg2Ii8+PHBhdGggZD0iTTEwIDIyaDQiLz48L3N2Zz4=";
+
+  const DATA_JSON_URL = "./data/service_stock.json";
+  const IMAGES_CSV_URL = "./images.csv";
+
+  const $ = (s, r=document) => r.querySelector(s);
+  const debounce = (fn, ms=220) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a), ms); }; };
+  const toNumber = (x) => {
+    if (x == null) return 0;
+    if (typeof x === "number") return x;
+    const s = String(x).replace(/\s+/g,"").replace(/[^\d\-]/g,"");
+    const v = Number(s);
+    return isFinite(v) ? v : 0;
+  };
+
+  const hdr = $("#hdr");
+  const q = $("#q");
+  const clearBtn = $("#clear");
+  const onlyInStock = $("#onlyInStock");
+  const showImages = $("#showImages");
+  const sortKey = $("#sortKey");
+  const list = $("#list");
+  const stats = $("#stats");
+  const errorBox = $("#error");
+  const itemsCount = $("#itemsCount");
+  const themeToggle = $("#themeToggle");
+  const themeIcon = $("#themeIcon");
+
+  let OFFERS = [];
+  let IMG_MAP = new Map();
+
+  function setBulbForTheme(){
+    const cur = document.documentElement.getAttribute("data-theme") || "light";
+    themeIcon.src = cur === "light" ? BULB_ON : BULB_OFF_X;
+  }
+  function applyTheme(t){
+    document.documentElement.setAttribute("data-theme", t);
+    setBulbForTheme();
+    updateOffsets();
+  }
+  themeToggle.addEventListener("click", ()=>{
+    const cur = document.documentElement.getAttribute("data-theme") || "light";
+    const next = cur === "light" ? "dark" : "light";
+    applyTheme(next);
+    localStorage.setItem("theme", next);
+  });
+  applyTheme(localStorage.getItem("theme") || "light");
+
+  function updateOffsets(){
+    const h = hdr.offsetHeight || 56;
+    document.documentElement.style.setProperty("--hdr-h", h + "px");
+    document.documentElement.style.setProperty("--controls-top", h + "px");
+  }
+  window.addEventListener("resize", updateOffsets);
+
+  async function fetchText(url){
+    const res = await fetch(url + "?t=" + Date.now(), { cache: "no-store" });
+    if(!res.ok) throw new Error("HTTP " + res.status + " for " + url);
+    return res.text();
+  }
+
+  function hget(obj, key){
+    const map = obj.__caseMap || (obj.__caseMap = Object.keys(obj).reduce((m,k)=>{ m[k.toLowerCase()] = k; return m; },{}));
+    const k = map[key.toLowerCase()];
+    return k ? obj[k] : undefined;
+  }
+
+  async function fetchImages(){
+    try{
+      const csv = await fetchText(IMAGES_CSV_URL);
+      const p = Papa.parse(csv, { header:true, skipEmptyLines:true });
+      IMG_MAP.clear();
+      (p.data || []).forEach(r=>{
+        const sku = String(hget(r,"sku") || hget(r,"SKU") || "").trim();
+        const url = String(hget(r,"url") || hget(r,"URL") || "").trim();
+        if(sku && url && url !== "-") IMG_MAP.set(sku, url);
+      });
+    }catch(e){
+      IMG_MAP.clear();
+    }
+  }
+
+  async function fetchOffersFromJSON(){
+    const raw = await fetchText(DATA_JSON_URL);
+    let data = JSON.parse(raw);
+
+    let rows;
+    if (Array.isArray(data)) rows = data;
+    else if (data && Array.isArray(data.value)) rows = data.value.map(x => x?.fields ?? x ?? {});
+    else rows = [];
+
+    return rows.map(r=>{
+      const sku = String(hget(r,"SKU") ?? hget(r,"sku") ?? "").trim();
+      const model = String(hget(r,"Model") ?? hget(r,"model") ?? "").trim();
+      const qty = toNumber(hget(r,"Qty") ?? hget(r,"qty") ?? hget(r,"Бронь для сервиса") ?? hget(r,"бронь для сервиса"));
+      return {
+        sku,
+        model,
+        modelLC: model.toLowerCase(),
+        qty,
+        available: qty > 0
+      };
+    }).filter(x => x.sku);
+  }
+
+  function sortOffers(arr){
+    const a = arr.slice();
+    switch(sortKey.value){
+      case "qty_desc": return a.sort((x,y)=> y.qty - x.qty);
+      case "qty_asc":  return a.sort((x,y)=> x.qty - y.qty);
+      case "sku_desc": return a.sort((x,y)=> y.sku.localeCompare(x.sku));
+      case "sku_asc":  return a.sort((x,y)=> x.sku.localeCompare(y.sku));
+      default:         return a.sort((x,y)=> (y.available - x.available) || (y.qty - x.qty) || x.model.localeCompare(y.model));
+    }
+  }
+
+  function currentFiltered(){
+    const term = q.value.trim().toLowerCase();
+    return OFFERS.filter(o=>{
+      const hit = o.sku.toLowerCase().includes(term) || o.modelLC.includes(term);
+      return hit && (!onlyInStock.checked || o.qty > 0);
+    });
+  }
+
+  function renderList(){
+    const data = sortOffers(currentFiltered());
+    list.innerHTML = "";
+
+    if(!data.length){
+      list.innerHTML = `<div class="card"><div class="model">Ничего не найдено.</div></div>`;
+      stats.textContent = "—";
+      itemsCount.textContent = `0 позиций`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    const imgsOn = showImages.checked;
+
+    for(const o of data){
+      const card = document.createElement("div");
+      card.className = "card" + (o.qty<=0 ? " oos" : "");
+
+      const badgeClass = o.qty > 0 ? "ok" : "no";
+      const badgeText  = o.qty > 0 ? "В наличии" : "Нет в наличии";
+      const imgUrl = IMG_MAP.get(o.sku) || "";
+
+      card.innerHTML = `
+        <div class="row1">
+          <div class="sku">${o.sku}</div>
+          <span class="badge ${badgeClass}">${badgeText}</span>
+        </div>
+
+        <div class="model">${o.model || "<span class='muted'>—</span>"}</div>
+
+        <div class="meta">
+          <div class="leftMeta">
+            ${imgUrl && imgsOn ? `<img class="thumb" loading="lazy" src="${imgUrl}" alt="${o.model}">` : ``}
+            <div>
+              <span class="qtyLabel">Бронь для сервиса:</span>
+              <span class="qtyBig">${o.qty}</span>
+            </div>
+          </div>
+        </div>
+      `;
+      frag.appendChild(card);
+    }
+
+    list.appendChild(frag);
+
+    itemsCount.textContent = `${OFFERS.length} позиций`;
+    stats.textContent = `Показано ${data.length} / ${OFFERS.length}${onlyInStock.checked ? " (только в наличии)" : ""}${showImages.checked ? "" : " • изображения скрыты"}`;
+  }
+
+  async function init(){
+    try{
+      updateOffsets();
+      stats.textContent = "Загрузка…";
+      await fetchImages();
+      OFFERS = await fetchOffersFromJSON();
+      if(!OFFERS.length) throw new Error("Parsed 0 rows");
+      errorBox.hidden = true;
+      renderList();
+      console.log("✅ UI ready");
+    }catch(err){
+      console.error(err);
+      errorBox.hidden = false;
+      errorBox.textContent = "Не удалось загрузить: " + err.message;
+      stats.textContent = "—";
+      itemsCount.textContent = "—";
+    }
+  }
+
+  q.addEventListener("input", debounce(renderList, 220));
+  onlyInStock.addEventListener("change", renderList);
+  showImages.addEventListener("change", renderList);
+  sortKey.addEventListener("change", renderList);
+  clearBtn.addEventListener("click", ()=>{ q.value=""; q.focus(); renderList(); });
+
+  // refresh every 15 minutes (frontend)
+  setInterval(init, 15*60*1000);
+  init();
+</script>
+</body>
+</html>
