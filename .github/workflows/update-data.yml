@@ -1,0 +1,57 @@
+name: Update service stock JSON
+
+on:
+  schedule:
+    - cron: "0 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install deps
+        run: pip install -r requirements.txt
+
+      - name: Pull SharePoint table -> JSON
+        env:
+          TENANT_ID: ${{ secrets.TENANT_ID }}
+          CLIENT_ID: ${{ secrets.CLIENT_ID }}
+          CLIENT_SECRET: ${{ secrets.CLIENT_SECRET }}
+          SP_SITE_HOSTNAME: ${{ secrets.SP_SITE_HOSTNAME }}
+          SP_SITE_PATH: ${{ secrets.SP_SITE_PATH }}
+          SP_XLSX_PATH: ${{ secrets.SP_XLSX_PATH }}
+          SP_TABLE_NAME: ${{ secrets.SP_TABLE_NAME }}
+          # Optional overrides if your column names are weird:
+          # SP_COL_SKU: ${{ secrets.SP_COL_SKU }}
+          # SP_COL_MODEL: ${{ secrets.SP_COL_MODEL }}
+          # SP_COL_QTY: ${{ secrets.SP_COL_QTY }}
+        run: python scripts/sharepoint_to_json.py
+
+      - name: Generate CSS from palette.py
+        run: python scripts/generate_css.py
+
+      - name: Commit & push (only if changed)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add public/data/service_stock.json public/styles.css
+
+          if git diff --cached --quiet; then
+            echo "✅ No changes to commit."
+          else
+            git commit -m "chore: update service stock data"
+            git push
+            echo "✅ Pushed updated data."
+          fi
